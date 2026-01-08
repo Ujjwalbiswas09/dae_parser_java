@@ -116,5 +116,19 @@ public class DAEParserExample {
         System.out.println("    DAEMesh mesh = geometry.getMesh();");
         System.out.println("    // Access vertex data, triangles, etc.");
         System.out.println("  }");
+        
+        System.out.println("\nTriangulated data for VBO creation:");
+        System.out.println("  DAEMesh mesh = geometry.getMesh();");
+        System.out.println("  ");
+        System.out.println("  // Get interleaved vertex data (pos + normal + texcoord)");
+        System.out.println("  float[] vboData = mesh.getTriangulatedVertexData();");
+        System.out.println("  ");
+        System.out.println("  // Or get individual attributes:");
+        System.out.println("  float[] positions = mesh.getTriangulatedPositions();");
+        System.out.println("  float[] normals = mesh.getTriangulatedNormals();");
+        System.out.println("  float[] texCoords = mesh.getTriangulatedTexCoords();");
+        System.out.println("  ");
+        System.out.println("  // Use these arrays directly with OpenGL/Vulkan/DirectX:");
+        System.out.println("  // glBufferData(GL_ARRAY_BUFFER, vboData, GL_STATIC_DRAW);");
     }
 }

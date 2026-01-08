@@ -245,4 +245,84 @@ public class DAEParserTest {
         assertEquals("Second time should be 1.0", 1.0f, timeData[1], 0.001f);
         assertEquals("Third time should be 2.0", 2.0f, timeData[2], 0.001f);
     }
+
+    @Test
+    public void testTriangulatedPositions() throws Exception {
+        InputStream is = getClass().getResourceAsStream("/triangle.dae");
+        DAEDocument doc = DAEParser.parse(is);
+
+        DAEGeometry geometry = doc.getGeometries().get(0);
+        DAEMesh mesh = geometry.getMesh();
+
+        float[] triangulatedPositions = mesh.getTriangulatedPositions();
+        assertNotNull("Triangulated positions should not be null", triangulatedPositions);
+        
+        // Triangle has 3 vertices, each with 3 components (x, y, z)
+        assertEquals("Should have 9 values (3 vertices * 3 components)", 9, triangulatedPositions.length);
+        
+        // First vertex (0.0, 1.0, 0.0)
+        assertEquals("First vertex X", 0.0f, triangulatedPositions[0], 0.001f);
+        assertEquals("First vertex Y", 1.0f, triangulatedPositions[1], 0.001f);
+        assertEquals("First vertex Z", 0.0f, triangulatedPositions[2], 0.001f);
+        
+        // Second vertex (-1.0, -1.0, 0.0)
+        assertEquals("Second vertex X", -1.0f, triangulatedPositions[3], 0.001f);
+        assertEquals("Second vertex Y", -1.0f, triangulatedPositions[4], 0.001f);
+        assertEquals("Second vertex Z", 0.0f, triangulatedPositions[5], 0.001f);
+        
+        // Third vertex (1.0, -1.0, 0.0)
+        assertEquals("Third vertex X", 1.0f, triangulatedPositions[6], 0.001f);
+        assertEquals("Third vertex Y", -1.0f, triangulatedPositions[7], 0.001f);
+        assertEquals("Third vertex Z", 0.0f, triangulatedPositions[8], 0.001f);
+    }
+
+    @Test
+    public void testTriangulatedVertexDataWithNormals() throws Exception {
+        InputStream is = getClass().getResourceAsStream("/cube.dae");
+        DAEDocument doc = DAEParser.parse(is);
+
+        DAEGeometry geometry = doc.getGeometries().get(0);
+        DAEMesh mesh = geometry.getMesh();
+
+        float[] triangulatedData = mesh.getTriangulatedVertexData();
+        assertNotNull("Triangulated data should not be null", triangulatedData);
+        
+        // Cube has 12 triangles, each with 3 vertices, each vertex has position (3) + normal (3) = 6 components
+        assertEquals("Should have 216 values (12 triangles * 3 vertices * 6 components)", 
+                     216, triangulatedData.length);
+        
+        // Verify first vertex has both position and normal data
+        // Position should be (-1.0, -1.0, -1.0) based on cube.dae
+        assertEquals("First vertex position X", -1.0f, triangulatedData[0], 0.001f);
+        assertEquals("First vertex position Y", -1.0f, triangulatedData[1], 0.001f);
+        assertEquals("First vertex position Z", -1.0f, triangulatedData[2], 0.001f);
+        
+        // Normal should follow position (0.0, 0.0, -1.0) based on cube.dae first triangle
+        assertEquals("First vertex normal X", 0.0f, triangulatedData[3], 0.001f);
+        assertEquals("First vertex normal Y", 0.0f, triangulatedData[4], 0.001f);
+        assertEquals("First vertex normal Z", -1.0f, triangulatedData[5], 0.001f);
+    }
+
+    @Test
+    public void testTriangulatedNormals() throws Exception {
+        InputStream is = getClass().getResourceAsStream("/cube.dae");
+        DAEDocument doc = DAEParser.parse(is);
+
+        DAEGeometry geometry = doc.getGeometries().get(0);
+        DAEMesh mesh = geometry.getMesh();
+
+        float[] triangulatedNormals = mesh.getTriangulatedNormals();
+        assertNotNull("Triangulated normals should not be null", triangulatedNormals);
+        
+        // Cube has 12 triangles, each with 3 vertices, each normal has 3 components
+        assertEquals("Should have 108 values (12 triangles * 3 vertices * 3 components)", 
+                     108, triangulatedNormals.length);
+        
+        // First triangle should have normal (0.0, 0.0, -1.0)
+        for (int i = 0; i < 3; i++) {  // 3 vertices of first triangle
+            assertEquals("Normal X for vertex " + i, 0.0f, triangulatedNormals[i * 3], 0.001f);
+            assertEquals("Normal Y for vertex " + i, 0.0f, triangulatedNormals[i * 3 + 1], 0.001f);
+            assertEquals("Normal Z for vertex " + i, -1.0f, triangulatedNormals[i * 3 + 2], 0.001f);
+        }
+    }
 }
