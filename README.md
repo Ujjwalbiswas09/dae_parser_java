@@ -7,6 +7,7 @@ A lightweight COLLADA (DAE) file parser for Java and Android applications. This 
 - ✅ Parse COLLADA DAE files (version 1.4.1)
 - ✅ Extract 3D geometry data (vertices, normals, texture coordinates)
 - ✅ Parse mesh triangles and polygons
+- ✅ **Generate triangulated vertex data for VBO creation**
 - ✅ Parse animations (keyframes, samplers, channels)
 - ✅ Access material properties
 - ✅ Parse scene hierarchies and transformations
@@ -130,6 +131,32 @@ List<DAEAnimation> animations = doc.getAnimations();
 DAEScene scene = doc.getScene();
 List<DAENode> nodes = scene.getNodes();
 ```
+
+### Triangulated Data for VBO Creation
+
+The parser provides methods to get triangulated vertex data suitable for direct use with Vertex Buffer Objects (VBO) in OpenGL, Vulkan, DirectX, etc.
+
+```java
+DAEGeometry geometry = doc.getGeometries().get(0);
+DAEMesh mesh = geometry.getMesh();
+
+// Get interleaved vertex data (position + normal + texcoord)
+// Format: [x, y, z, nx, ny, nz, u, v, x, y, z, nx, ny, nz, u, v, ...]
+float[] vboData = mesh.getTriangulatedVertexData();
+
+// Or get individual attributes:
+float[] positions = mesh.getTriangulatedPositions();  // [x, y, z, x, y, z, ...]
+float[] normals = mesh.getTriangulatedNormals();      // [nx, ny, nz, nx, ny, nz, ...]
+float[] texCoords = mesh.getTriangulatedTexCoords();  // [u, v, u, v, ...]
+
+// Use with OpenGL
+// glBufferData(GL_ARRAY_BUFFER, vboData, GL_STATIC_DRAW);
+```
+
+**Why triangulated data?**
+- COLLADA files use indexed vertices (like `<p>0 1 2</p>`) that reference separate arrays for positions, normals, and texture coordinates
+- For VBO creation, you typically need expanded (non-indexed) vertex data where each triangle vertex has all its attributes
+- The triangulation methods expand the indexed data into contiguous arrays ready for GPU upload
 
 ## API Overview
 

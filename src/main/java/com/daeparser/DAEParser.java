@@ -143,6 +143,22 @@ public class DAEParser {
         if (verticesElements.getLength() > 0) {
             Element verticesElement = (Element) verticesElements.item(0);
             String verticesId = verticesElement.getAttribute("id");
+            mesh.setVerticesId(verticesId);
+            
+            // Parse input elements inside vertices to find position source
+            NodeList vertexInputs = verticesElement.getElementsByTagName("input");
+            for (int i = 0; i < vertexInputs.getLength(); i++) {
+                Element input = (Element) vertexInputs.item(i);
+                String semantic = input.getAttribute("semantic");
+                String source = input.getAttribute("source");
+                if (source.startsWith("#")) {
+                    source = source.substring(1);
+                }
+                if (semantic.equals("POSITION")) {
+                    // Store the position source for VERTEX semantic
+                    mesh.addInputSemantic("VERTEX", source);
+                }
+            }
         }
 
         // Parse triangles
@@ -154,17 +170,33 @@ public class DAEParser {
                 mesh.setTriangleCount(Integer.parseInt(countStr));
             }
 
-            // Determine stride from input elements
+            // Parse input elements and store semantics and offsets
             NodeList inputElements = trianglesElement.getElementsByTagName("input");
             int maxOffset = 0;
             for (int i = 0; i < inputElements.getLength(); i++) {
                 Element input = (Element) inputElements.item(i);
+                String semantic = input.getAttribute("semantic");
+                String source = input.getAttribute("source");
                 String offsetStr = input.getAttribute("offset");
+                
+                if (source.startsWith("#")) {
+                    source = source.substring(1);
+                }
+                
+                int offset = 0;
                 if (!offsetStr.isEmpty()) {
-                    int offset = Integer.parseInt(offsetStr);
+                    offset = Integer.parseInt(offsetStr);
                     if (offset > maxOffset) {
                         maxOffset = offset;
                     }
+                }
+                
+                // Store semantic to offset mapping
+                mesh.addInputOffset(semantic, offset);
+                
+                // Store semantic to source mapping (except VERTEX which was already mapped)
+                if (!semantic.equals("VERTEX")) {
+                    mesh.addInputSemantic(semantic, source);
                 }
             }
             int stride = maxOffset + 1;
@@ -175,18 +207,28 @@ public class DAEParser {
                 String[] indices = pElement.getTextContent().trim().split("\\s+");
                 
                 List<int[]> trianglesList = new ArrayList<>();
+                List<int[]> triangleIndicesList = new ArrayList<>();
+                
                 // Process triangles considering stride (multiple inputs with offsets)
                 for (int i = 0; i < indices.length; i += stride * 3) {
                     if (i + stride * 2 < indices.length) {
+                        // For backward compatibility, keep simple vertex-only triangles
                         int[] triangle = new int[3];
-                        // Extract only vertex indices (offset 0)
                         triangle[0] = Integer.parseInt(indices[i]);
                         triangle[1] = Integer.parseInt(indices[i + stride]);
                         triangle[2] = Integer.parseInt(indices[i + stride * 2]);
                         trianglesList.add(triangle);
+                        
+                        // Store full index data for triangulation
+                        int[] fullIndices = new int[stride * 3];
+                        for (int j = 0; j < stride * 3; j++) {
+                            fullIndices[j] = Integer.parseInt(indices[i + j]);
+                        }
+                        triangleIndicesList.add(fullIndices);
                     }
                 }
                 mesh.setTriangles(trianglesList);
+                mesh.setTriangleIndices(triangleIndicesList);
             }
         }
 
