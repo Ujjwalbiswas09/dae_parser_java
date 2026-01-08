@@ -134,6 +134,18 @@ public class DAEMesh {
             return null;
         }
         
+        // Calculate stride from input offsets
+        int stride = 0;
+        for (int offset : inputOffsets.values()) {
+            if (offset >= stride) {
+                stride = offset + 1;
+            }
+        }
+        
+        if (stride == 0) {
+            return null;
+        }
+        
         // Find sources for each semantic
         DAESource positionSource = null;
         DAESource normalSource = null;
@@ -196,7 +208,7 @@ public class DAEMesh {
         for (int[] triIndices : triangleIndices) {
             // Each triangle has 3 vertices
             for (int v = 0; v < 3; v++) {
-                int indexOffset = v * inputOffsets.size();
+                int indexOffset = v * stride;
                 
                 // Position data
                 Integer posOffset = inputOffsets.get("VERTEX");
@@ -252,6 +264,18 @@ public class DAEMesh {
             return null;
         }
         
+        // Calculate stride from input offsets
+        int stride = 0;
+        for (int offset : inputOffsets.values()) {
+            if (offset >= stride) {
+                stride = offset + 1;
+            }
+        }
+        
+        if (stride == 0) {
+            return null;
+        }
+        
         // Find position source
         DAESource positionSource = null;
         for (DAESource source : sources) {
@@ -279,7 +303,7 @@ public class DAEMesh {
         
         for (int[] triIndices : triangleIndices) {
             for (int v = 0; v < 3; v++) {
-                int indexOffset = v * inputOffsets.size();
+                int indexOffset = v * stride;
                 if (indexOffset + posOffset < triIndices.length) {
                     int posIndex = triIndices[indexOffset + posOffset];
                     for (int i = 0; i < posStride && posIndex * posStride + i < posData.length; i++) {
@@ -306,6 +330,18 @@ public class DAEMesh {
      */
     public float[] getTriangulatedNormals() {
         if (triangleIndices.isEmpty() || inputSemantics.isEmpty()) {
+            return null;
+        }
+        
+        // Calculate stride from input offsets
+        int stride = 0;
+        for (int offset : inputOffsets.values()) {
+            if (offset >= stride) {
+                stride = offset + 1;
+            }
+        }
+        
+        if (stride == 0) {
             return null;
         }
         
@@ -337,7 +373,7 @@ public class DAEMesh {
         
         for (int[] triIndices : triangleIndices) {
             for (int v = 0; v < 3; v++) {
-                int indexOffset = v * inputOffsets.size();
+                int indexOffset = v * stride;
                 if (indexOffset + normOffset < triIndices.length) {
                     int normIndex = triIndices[indexOffset + normOffset];
                     for (int i = 0; i < normStride && normIndex * normStride + i < normData.length; i++) {
@@ -364,6 +400,18 @@ public class DAEMesh {
      */
     public float[] getTriangulatedTexCoords() {
         if (triangleIndices.isEmpty() || inputSemantics.isEmpty()) {
+            return null;
+        }
+        
+        // Calculate stride from input offsets
+        int stride = 0;
+        for (int offset : inputOffsets.values()) {
+            if (offset >= stride) {
+                stride = offset + 1;
+            }
+        }
+        
+        if (stride == 0) {
             return null;
         }
         
@@ -395,7 +443,7 @@ public class DAEMesh {
         
         for (int[] triIndices : triangleIndices) {
             for (int v = 0; v < 3; v++) {
-                int indexOffset = v * inputOffsets.size();
+                int indexOffset = v * stride;
                 if (indexOffset + texOffset < triIndices.length) {
                     int texIndex = triIndices[indexOffset + texOffset];
                     for (int i = 0; i < texStride && texIndex * texStride + i < texData.length; i++) {
