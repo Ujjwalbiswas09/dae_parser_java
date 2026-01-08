@@ -11,12 +11,14 @@ public class DAEDocument {
     private List<DAEGeometry> geometries;
     private List<DAEMaterial> materials;
     private List<DAEAnimation> animations;
+    private List<DAEController> controllers;
     private DAEScene scene;
 
     public DAEDocument() {
         this.geometries = new ArrayList<>();
         this.materials = new ArrayList<>();
         this.animations = new ArrayList<>();
+        this.controllers = new ArrayList<>();
     }
 
     public String getVersion() {
@@ -63,6 +65,18 @@ public class DAEDocument {
         this.animations.add(animation);
     }
 
+    public List<DAEController> getControllers() {
+        return controllers;
+    }
+
+    public void setControllers(List<DAEController> controllers) {
+        this.controllers = controllers;
+    }
+
+    public void addController(DAEController controller) {
+        this.controllers.add(controller);
+    }
+
     public DAEScene getScene() {
         return scene;
     }
@@ -78,6 +92,7 @@ public class DAEDocument {
                 ", geometries=" + geometries.size() +
                 ", materials=" + materials.size() +
                 ", animations=" + animations.size() +
+                ", controllers=" + controllers.size() +
                 ", scene=" + scene +
                 '}';
     }

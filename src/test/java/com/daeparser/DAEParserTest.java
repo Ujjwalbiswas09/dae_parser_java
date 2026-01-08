@@ -325,4 +325,183 @@ public class DAEParserTest {
             assertEquals("Normal Z for vertex " + i, -1.0f, triangulatedNormals[i * 3 + 2], 0.001f);
         }
     }
+
+    @Test
+    public void testParseSkinnedMesh() throws Exception {
+        InputStream is = getClass().getResourceAsStream("/skinned_cylinder.dae");
+        assertNotNull("Test file not found", is);
+
+        DAEDocument doc = DAEParser.parse(is);
+        assertNotNull("Document should not be null", doc);
+
+        // Check controllers
+        List<DAEController> controllers = doc.getControllers();
+        assertNotNull("Controllers should not be null", controllers);
+        assertEquals("Should have 1 controller", 1, controllers.size());
+
+        DAEController controller = controllers.get(0);
+        assertEquals("Controller ID should be Cylinder-skin", "Cylinder-skin", controller.getId());
+        assertEquals("Controller name should be Cylinder", "Cylinder", controller.getName());
+
+        // Check skin
+        DAESkin skin = controller.getSkin();
+        assertNotNull("Skin should not be null", skin);
+        assertEquals("Skin source should be Cylinder-mesh", "Cylinder-mesh", skin.getSource());
+
+        // Check bind shape matrix
+        float[] bindShapeMatrix = skin.getBindShapeMatrix();
+        assertNotNull("Bind shape matrix should not be null", bindShapeMatrix);
+        assertEquals("Bind shape matrix should have 16 elements", 16, bindShapeMatrix.length);
+        assertEquals("Bind shape matrix [0,0] should be 1.0", 1.0f, bindShapeMatrix[0], 0.001f);
+        assertEquals("Bind shape matrix [3,3] should be 1.0", 1.0f, bindShapeMatrix[15], 0.001f);
+
+        // Check joint names
+        List<String> jointNames = skin.getJointNames();
+        assertNotNull("Joint names should not be null", jointNames);
+        assertEquals("Should have 3 joints", 3, jointNames.size());
+        assertEquals("First joint should be Bone1", "Bone1", jointNames.get(0));
+        assertEquals("Second joint should be Bone2", "Bone2", jointNames.get(1));
+        assertEquals("Third joint should be Bone3", "Bone3", jointNames.get(2));
+
+        // Check inverse bind matrices
+        float[] inverseBindMatrices = skin.getInverseBindMatrices();
+        assertNotNull("Inverse bind matrices should not be null", inverseBindMatrices);
+        assertEquals("Should have 48 values (3 joints * 16 floats)", 48, inverseBindMatrices.length);
+
+        // Check joint count
+        assertEquals("Joint count should be 3", 3, skin.getJointCount());
+
+        // Check vertex weights
+        List<int[]> vertexWeights = skin.getVertexWeights();
+        assertNotNull("Vertex weights should not be null", vertexWeights);
+        assertEquals("Should have 4 vertex weights", 4, vertexWeights.size());
+
+        // Check weights array
+        float[] weights = skin.getWeights();
+        assertNotNull("Weights array should not be null", weights);
+        assertEquals("Should have 8 weights", 8, weights.length);
+
+        // Check max joint influences
+        assertEquals("Max joint influences should be 2", 2, skin.getMaxJointInfluences());
+    }
+
+    @Test
+    public void testSkinJointInfluences() throws Exception {
+        InputStream is = getClass().getResourceAsStream("/skinned_cylinder.dae");
+        DAEDocument doc = DAEParser.parse(is);
+
+        DAEController controller = doc.getControllers().get(0);
+        DAESkin skin = controller.getSkin();
+
+        // Test first vertex (should have 1 influence)
+        float[] influences0 = skin.getVertexJointInfluences(0);
+        assertNotNull("Vertex 0 influences should not be null", influences0);
+        assertEquals("Vertex 0 should have 2 values (1 joint influence)", 2, influences0.length);
+        assertEquals("Vertex 0 joint index should be 0", 0.0f, influences0[0], 0.001f);
+        assertEquals("Vertex 0 weight should be 1.0", 1.0f, influences0[1], 0.001f);
+
+        // Test second vertex (should have 2 influences)
+        float[] influences1 = skin.getVertexJointInfluences(1);
+        assertNotNull("Vertex 1 influences should not be null", influences1);
+        assertEquals("Vertex 1 should have 4 values (2 joint influences)", 4, influences1.length);
+        assertEquals("Vertex 1 first joint index should be 0", 0.0f, influences1[0], 0.001f);
+        assertEquals("Vertex 1 first weight should be 0.5", 0.5f, influences1[1], 0.001f);
+        assertEquals("Vertex 1 second joint index should be 1", 1.0f, influences1[2], 0.001f);
+        assertEquals("Vertex 1 second weight should be 0.5", 0.5f, influences1[3], 0.001f);
+    }
+
+    @Test
+    public void testSkinJointInverseBindMatrix() throws Exception {
+        InputStream is = getClass().getResourceAsStream("/skinned_cylinder.dae");
+        DAEDocument doc = DAEParser.parse(is);
+
+        DAEController controller = doc.getControllers().get(0);
+        DAESkin skin = controller.getSkin();
+
+        // Test first joint's inverse bind matrix
+        float[] matrix0 = skin.getJointInverseBindMatrix(0);
+        assertNotNull("Joint 0 matrix should not be null", matrix0);
+        assertEquals("Joint 0 matrix should have 16 elements", 16, matrix0.length);
+        assertEquals("Joint 0 matrix [0,0] should be 1.0", 1.0f, matrix0[0], 0.001f);
+        assertEquals("Joint 0 matrix [3,3] should be 1.0", 1.0f, matrix0[15], 0.001f);
+
+        // Test second joint's inverse bind matrix
+        float[] matrix1 = skin.getJointInverseBindMatrix(1);
+        assertNotNull("Joint 1 matrix should not be null", matrix1);
+        assertEquals("Joint 1 matrix should have 16 elements", 16, matrix1.length);
+        assertEquals("Joint 1 matrix [1,3] should be -1.0", -1.0f, matrix1[7], 0.001f);
+
+        // Test invalid index
+        float[] matrixInvalid = skin.getJointInverseBindMatrix(99);
+        assertNull("Invalid joint index should return null", matrixInvalid);
+    }
+
+    @Test
+    public void testNodeWithController() throws Exception {
+        InputStream is = getClass().getResourceAsStream("/skinned_cylinder.dae");
+        DAEDocument doc = DAEParser.parse(is);
+
+        DAEScene scene = doc.getScene();
+        assertNotNull("Scene should not be null", scene);
+
+        List<DAENode> nodes = scene.getNodes();
+        assertNotNull("Nodes should not be null", nodes);
+        assertTrue("Should have at least 2 nodes", nodes.size() >= 2);
+
+        // Find the node with instance_controller
+        DAENode controllerNode = null;
+        for (DAENode node : nodes) {
+            if (node.getControllerRef() != null) {
+                controllerNode = node;
+                break;
+            }
+        }
+
+        assertNotNull("Should find node with controller", controllerNode);
+        assertEquals("Controller ref should be Cylinder-skin", "Cylinder-skin", controllerNode.getControllerRef());
+
+        // Check skeleton references
+        List<String> skeletonRefs = controllerNode.getSkeletonRefs();
+        assertNotNull("Skeleton refs should not be null", skeletonRefs);
+        assertEquals("Should have 1 skeleton reference", 1, skeletonRefs.size());
+        assertEquals("Skeleton ref should be Bone1", "Bone1", skeletonRefs.get(0));
+    }
+
+    @Test
+    public void testJointNodes() throws Exception {
+        InputStream is = getClass().getResourceAsStream("/skinned_cylinder.dae");
+        DAEDocument doc = DAEParser.parse(is);
+
+        DAEScene scene = doc.getScene();
+        List<DAENode> nodes = scene.getNodes();
+
+        // Find the armature node
+        DAENode armatureNode = null;
+        for (DAENode node : nodes) {
+            if ("Armature".equals(node.getName())) {
+                armatureNode = node;
+                break;
+            }
+        }
+
+        assertNotNull("Should find armature node", armatureNode);
+        assertTrue("Armature should have children", armatureNode.getChildren().size() > 0);
+
+        // Check first bone (joint)
+        DAENode bone1 = armatureNode.getChildren().get(0);
+        assertEquals("First bone should be Bone1", "Bone1", bone1.getName());
+        assertEquals("First bone type should be JOINT", "JOINT", bone1.getType());
+        assertTrue("Bone1 should be a joint", bone1.isJoint());
+
+        // Check bone hierarchy
+        assertTrue("Bone1 should have children", bone1.getChildren().size() > 0);
+        DAENode bone2 = bone1.getChildren().get(0);
+        assertEquals("Second bone should be Bone2", "Bone2", bone2.getName());
+        assertTrue("Bone2 should be a joint", bone2.isJoint());
+
+        assertTrue("Bone2 should have children", bone2.getChildren().size() > 0);
+        DAENode bone3 = bone2.getChildren().get(0);
+        assertEquals("Third bone should be Bone3", "Bone3", bone3.getName());
+        assertTrue("Bone3 should be a joint", bone3.isJoint());
+    }
 }

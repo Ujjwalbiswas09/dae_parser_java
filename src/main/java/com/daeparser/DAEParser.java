@@ -100,6 +100,17 @@ public class DAEParser {
             }
         }
 
+        // Parse library_controllers
+        NodeList controllerLibraries = root.getElementsByTagName("library_controllers");
+        if (controllerLibraries.getLength() > 0) {
+            Element controllerLibrary = (Element) controllerLibraries.item(0);
+            NodeList controllers = controllerLibrary.getElementsByTagName("controller");
+            for (int i = 0; i < controllers.getLength(); i++) {
+                DAEController controller = parseController((Element) controllers.item(i));
+                daeDoc.addController(controller);
+            }
+        }
+
         // Parse library_visual_scenes
         NodeList sceneLibraries = root.getElementsByTagName("library_visual_scenes");
         if (sceneLibraries.getLength() > 0) {
@@ -321,6 +332,12 @@ public class DAEParser {
         DAENode node = new DAENode();
         node.setId(nodeElement.getAttribute("id"));
         node.setName(nodeElement.getAttribute("name"));
+        
+        // Parse node type
+        String type = nodeElement.getAttribute("type");
+        if (type != null && !type.isEmpty()) {
+            node.setType(type);
+        }
 
         // Parse transformation matrix
         NodeList matrices = nodeElement.getElementsByTagName("matrix");
@@ -343,6 +360,27 @@ public class DAEParser {
             String url = instanceGeometry.getAttribute("url");
             if (url.startsWith("#")) {
                 node.setGeometryRef(url.substring(1));
+            }
+        }
+        
+        // Parse instance_controller
+        NodeList instanceControllers = nodeElement.getElementsByTagName("instance_controller");
+        if (instanceControllers.getLength() > 0) {
+            Element instanceController = (Element) instanceControllers.item(0);
+            String url = instanceController.getAttribute("url");
+            if (url.startsWith("#")) {
+                node.setControllerRef(url.substring(1));
+            }
+            
+            // Parse skeleton references
+            NodeList skeletons = instanceController.getElementsByTagName("skeleton");
+            for (int i = 0; i < skeletons.getLength(); i++) {
+                Element skeleton = (Element) skeletons.item(i);
+                String skeletonRef = skeleton.getTextContent().trim();
+                if (skeletonRef.startsWith("#")) {
+                    skeletonRef = skeletonRef.substring(1);
+                }
+                node.addSkeletonRef(skeletonRef);
             }
         }
 
@@ -431,5 +469,245 @@ public class DAEParser {
         channel.setTarget(target);
 
         return channel;
+    }
+
+    private static DAEController parseController(Element controllerElement) {
+        DAEController controller = new DAEController();
+        controller.setId(controllerElement.getAttribute("id"));
+        controller.setName(controllerElement.getAttribute("name"));
+
+        // Parse skin element
+        NodeList skins = controllerElement.getElementsByTagName("skin");
+        if (skins.getLength() > 0) {
+            DAESkin skin = parseSkin((Element) skins.item(0));
+            controller.setSkin(skin);
+        }
+
+        return controller;
+    }
+
+    private static DAESkin parseSkin(Element skinElement) {
+        DAESkin skin = new DAESkin();
+        
+        // Parse source reference (geometry being skinned)
+        String source = skinElement.getAttribute("source");
+        if (source.startsWith("#")) {
+            source = source.substring(1);
+        }
+        skin.setSource(source);
+
+        // Parse bind_shape_matrix
+        NodeList bindShapeMatrices = skinElement.getElementsByTagName("bind_shape_matrix");
+        if (bindShapeMatrices.getLength() > 0) {
+            Element bindShapeMatrix = (Element) bindShapeMatrices.item(0);
+            String[] values = bindShapeMatrix.getTextContent().trim().split("\\s+");
+            if (values.length == 16) {
+                float[] matrix = new float[16];
+                for (int i = 0; i < 16; i++) {
+                    matrix[i] = Float.parseFloat(values[i]);
+                }
+                skin.setBindShapeMatrix(matrix);
+            }
+        }
+
+        // Parse sources (joint names, bind matrices, weights)
+        NodeList sources = skinElement.getElementsByTagName("source");
+        for (int i = 0; i < sources.getLength(); i++) {
+            Element sourceElement = (Element) sources.item(i);
+            if (sourceElement.getParentNode().equals(skinElement)) {
+                DAESource source2 = parseSourceForSkin(sourceElement);
+                skin.addSource(source2);
+            }
+        }
+
+        // Parse joints element to identify sources
+        NodeList jointsElements = skinElement.getElementsByTagName("joints");
+        if (jointsElements.getLength() > 0) {
+            Element jointsElement = (Element) jointsElements.item(0);
+            NodeList inputs = jointsElement.getElementsByTagName("input");
+            
+            String jointNamesSourceId = null;
+            String inverseBindMatricesSourceId = null;
+            
+            for (int i = 0; i < inputs.getLength(); i++) {
+                Element input = (Element) inputs.item(i);
+                String semantic = input.getAttribute("semantic");
+                String sourceRef = input.getAttribute("source");
+                if (sourceRef.startsWith("#")) {
+                    sourceRef = sourceRef.substring(1);
+                }
+                
+                if (semantic.equals("JOINT")) {
+                    jointNamesSourceId = sourceRef;
+                } else if (semantic.equals("INV_BIND_MATRIX")) {
+                    inverseBindMatricesSourceId = sourceRef;
+                }
+            }
+            
+            // Extract joint names and inverse bind matrices
+            for (DAESource source2 : skin.getSources()) {
+                if (source2.getId().equals(jointNamesSourceId)) {
+                    // This is the joint names source (Name_array)
+                    List<String> names = source2.getNames();
+                    if (names != null) {
+                        skin.setJointNames(names);
+                    }
+                } else if (source2.getId().equals(inverseBindMatricesSourceId)) {
+                    // This is the inverse bind matrices source
+                    float[] matrices = source2.getDataAsArray();
+                    skin.setInverseBindMatrices(matrices);
+                }
+            }
+        }
+
+        // Parse vertex_weights element
+        NodeList vertexWeightsElements = skinElement.getElementsByTagName("vertex_weights");
+        if (vertexWeightsElements.getLength() > 0) {
+            Element vertexWeightsElement = (Element) vertexWeightsElements.item(0);
+            String countStr = vertexWeightsElement.getAttribute("count");
+            int vertexCount = countStr.isEmpty() ? 0 : Integer.parseInt(countStr);
+            
+            // Parse inputs to get offsets
+            NodeList inputs = vertexWeightsElement.getElementsByTagName("input");
+            int jointOffset = -1;
+            int weightOffset = -1;
+            String weightsSourceId = null;
+            int maxOffset = 0;
+            
+            for (int i = 0; i < inputs.getLength(); i++) {
+                Element input = (Element) inputs.item(i);
+                String semantic = input.getAttribute("semantic");
+                String offsetStr = input.getAttribute("offset");
+                String sourceRef = input.getAttribute("source");
+                if (sourceRef.startsWith("#")) {
+                    sourceRef = sourceRef.substring(1);
+                }
+                
+                int offset = offsetStr.isEmpty() ? 0 : Integer.parseInt(offsetStr);
+                if (offset > maxOffset) {
+                    maxOffset = offset;
+                }
+                
+                if (semantic.equals("JOINT")) {
+                    jointOffset = offset;
+                } else if (semantic.equals("WEIGHT")) {
+                    weightOffset = offset;
+                    weightsSourceId = sourceRef;
+                }
+            }
+            
+            int stride = maxOffset + 1;
+            
+            // Get weights array
+            for (DAESource source2 : skin.getSources()) {
+                if (source2.getId().equals(weightsSourceId)) {
+                    float[] weightsArray = source2.getDataAsArray();
+                    skin.setWeights(weightsArray);
+                    break;
+                }
+            }
+            
+            // Parse vcount (number of influences per vertex)
+            NodeList vcountElements = vertexWeightsElement.getElementsByTagName("vcount");
+            int[] vcounts = null;
+            if (vcountElements.getLength() > 0) {
+                Element vcountElement = (Element) vcountElements.item(0);
+                String[] vcountValues = vcountElement.getTextContent().trim().split("\\s+");
+                vcounts = new int[vcountValues.length];
+                int maxInfluences = 0;
+                for (int i = 0; i < vcountValues.length; i++) {
+                    vcounts[i] = Integer.parseInt(vcountValues[i]);
+                    if (vcounts[i] > maxInfluences) {
+                        maxInfluences = vcounts[i];
+                    }
+                }
+                skin.setMaxJointInfluences(maxInfluences);
+            }
+            
+            // Parse v (joint and weight indices)
+            NodeList vElements = vertexWeightsElement.getElementsByTagName("v");
+            if (vElements.getLength() > 0 && vcounts != null) {
+                Element vElement = (Element) vElements.item(0);
+                String[] vValues = vElement.getTextContent().trim().split("\\s+");
+                
+                int vIndex = 0;
+                for (int i = 0; i < vcounts.length; i++) {
+                    int influenceCount = vcounts[i];
+                    int[] vertexWeight = new int[influenceCount * 2]; // pairs of (joint_index, weight_index)
+                    
+                    for (int j = 0; j < influenceCount; j++) {
+                        if (vIndex + stride <= vValues.length) {
+                            int jointIdx = Integer.parseInt(vValues[vIndex + jointOffset]);
+                            int weightIdx = Integer.parseInt(vValues[vIndex + weightOffset]);
+                            
+                            vertexWeight[j * 2] = jointIdx;
+                            vertexWeight[j * 2 + 1] = weightIdx;
+                            
+                            vIndex += stride;
+                        }
+                    }
+                    
+                    skin.addVertexWeight(vertexWeight);
+                }
+            }
+        }
+
+        return skin;
+    }
+
+    private static DAESource parseSourceForSkin(Element sourceElement) {
+        DAESource source = new DAESource();
+        source.setId(sourceElement.getAttribute("id"));
+        source.setName(sourceElement.getAttribute("name"));
+
+        // Parse float_array for numeric data
+        NodeList floatArrays = sourceElement.getElementsByTagName("float_array");
+        if (floatArrays.getLength() > 0) {
+            Element floatArray = (Element) floatArrays.item(0);
+            String countStr = floatArray.getAttribute("count");
+            if (!countStr.isEmpty()) {
+                source.setCount(Integer.parseInt(countStr));
+            }
+
+            String[] values = floatArray.getTextContent().trim().split("\\s+");
+            List<Float> data = new ArrayList<>();
+            for (String value : values) {
+                if (!value.isEmpty()) {
+                    data.add(Float.parseFloat(value));
+                }
+            }
+            source.setData(data);
+        }
+        
+        // Parse Name_array for joint names
+        NodeList nameArrays = sourceElement.getElementsByTagName("Name_array");
+        if (nameArrays.getLength() > 0) {
+            Element nameArray = (Element) nameArrays.item(0);
+            String countStr = nameArray.getAttribute("count");
+            if (!countStr.isEmpty()) {
+                source.setCount(Integer.parseInt(countStr));
+            }
+
+            String[] values = nameArray.getTextContent().trim().split("\\s+");
+            List<String> names = new ArrayList<>();
+            for (String value : values) {
+                if (!value.isEmpty()) {
+                    names.add(value);
+                }
+            }
+            source.setNames(names);
+        }
+
+        // Parse accessor for stride information
+        NodeList accessors = sourceElement.getElementsByTagName("accessor");
+        if (accessors.getLength() > 0) {
+            Element accessor = (Element) accessors.item(0);
+            String strideStr = accessor.getAttribute("stride");
+            if (!strideStr.isEmpty()) {
+                source.setStride(Integer.parseInt(strideStr));
+            }
+        }
+
+        return source;
     }
 }
