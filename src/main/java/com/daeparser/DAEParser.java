@@ -1,0 +1,288 @@
+package com.daeparser;
+
+import org.w3c.dom.*;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import java.io.File;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Main parser class for COLLADA DAE files.
+ * Parses DAE XML files and converts them into Java objects.
+ */
+public class DAEParser {
+
+    /**
+     * Parse a DAE file from a file path.
+     *
+     * @param filePath Path to the DAE file
+     * @return Parsed DAEDocument
+     * @throws Exception if parsing fails
+     */
+    public static DAEDocument parse(String filePath) throws Exception {
+        File file = new File(filePath);
+        return parse(file);
+    }
+
+    /**
+     * Parse a DAE file from a File object.
+     *
+     * @param file DAE file
+     * @return Parsed DAEDocument
+     * @throws Exception if parsing fails
+     */
+    public static DAEDocument parse(File file) throws Exception {
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        factory.setNamespaceAware(true);
+        DocumentBuilder builder = factory.newDocumentBuilder();
+        Document doc = builder.parse(file);
+        return parseDocument(doc);
+    }
+
+    /**
+     * Parse a DAE file from an InputStream.
+     *
+     * @param inputStream InputStream containing DAE data
+     * @return Parsed DAEDocument
+     * @throws Exception if parsing fails
+     */
+    public static DAEDocument parse(InputStream inputStream) throws Exception {
+        DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+        factory.setNamespaceAware(true);
+        DocumentBuilder builder = factory.newDocumentBuilder();
+        Document doc = builder.parse(inputStream);
+        return parseDocument(doc);
+    }
+
+    private static DAEDocument parseDocument(Document doc) {
+        DAEDocument daeDoc = new DAEDocument();
+
+        Element root = doc.getDocumentElement();
+        String version = root.getAttribute("version");
+        daeDoc.setVersion(version);
+
+        // Parse library_geometries
+        NodeList geometryLibraries = root.getElementsByTagName("library_geometries");
+        if (geometryLibraries.getLength() > 0) {
+            Element geometryLibrary = (Element) geometryLibraries.item(0);
+            NodeList geometries = geometryLibrary.getElementsByTagName("geometry");
+            for (int i = 0; i < geometries.getLength(); i++) {
+                DAEGeometry geometry = parseGeometry((Element) geometries.item(i));
+                daeDoc.addGeometry(geometry);
+            }
+        }
+
+        // Parse library_materials
+        NodeList materialLibraries = root.getElementsByTagName("library_materials");
+        if (materialLibraries.getLength() > 0) {
+            Element materialLibrary = (Element) materialLibraries.item(0);
+            NodeList materials = materialLibrary.getElementsByTagName("material");
+            for (int i = 0; i < materials.getLength(); i++) {
+                DAEMaterial material = parseMaterial((Element) materials.item(i));
+                daeDoc.addMaterial(material);
+            }
+        }
+
+        // Parse library_visual_scenes
+        NodeList sceneLibraries = root.getElementsByTagName("library_visual_scenes");
+        if (sceneLibraries.getLength() > 0) {
+            Element sceneLibrary = (Element) sceneLibraries.item(0);
+            NodeList visualScenes = sceneLibrary.getElementsByTagName("visual_scene");
+            if (visualScenes.getLength() > 0) {
+                DAEScene scene = parseScene((Element) visualScenes.item(0));
+                daeDoc.setScene(scene);
+            }
+        }
+
+        return daeDoc;
+    }
+
+    private static DAEGeometry parseGeometry(Element geometryElement) {
+        DAEGeometry geometry = new DAEGeometry();
+        geometry.setId(geometryElement.getAttribute("id"));
+        geometry.setName(geometryElement.getAttribute("name"));
+
+        NodeList meshes = geometryElement.getElementsByTagName("mesh");
+        if (meshes.getLength() > 0) {
+            DAEMesh mesh = parseMesh((Element) meshes.item(0));
+            geometry.setMesh(mesh);
+        }
+
+        return geometry;
+    }
+
+    private static DAEMesh parseMesh(Element meshElement) {
+        DAEMesh mesh = new DAEMesh();
+
+        // Parse sources
+        NodeList sources = meshElement.getElementsByTagName("source");
+        for (int i = 0; i < sources.getLength(); i++) {
+            DAESource source = parseSource((Element) sources.item(i));
+            mesh.addSource(source);
+        }
+
+        // Parse vertices
+        NodeList verticesElements = meshElement.getElementsByTagName("vertices");
+        if (verticesElements.getLength() > 0) {
+            Element verticesElement = (Element) verticesElements.item(0);
+            String verticesId = verticesElement.getAttribute("id");
+        }
+
+        // Parse triangles
+        NodeList trianglesElements = meshElement.getElementsByTagName("triangles");
+        if (trianglesElements.getLength() > 0) {
+            Element trianglesElement = (Element) trianglesElements.item(0);
+            String countStr = trianglesElement.getAttribute("count");
+            if (!countStr.isEmpty()) {
+                mesh.setTriangleCount(Integer.parseInt(countStr));
+            }
+
+            NodeList pElements = trianglesElement.getElementsByTagName("p");
+            if (pElements.getLength() > 0) {
+                Element pElement = (Element) pElements.item(0);
+                String[] indices = pElement.getTextContent().trim().split("\\s+");
+                
+                List<int[]> trianglesList = new ArrayList<>();
+                for (int i = 0; i < indices.length; i += 3) {
+                    if (i + 2 < indices.length) {
+                        int[] triangle = new int[3];
+                        triangle[0] = Integer.parseInt(indices[i]);
+                        triangle[1] = Integer.parseInt(indices[i + 1]);
+                        triangle[2] = Integer.parseInt(indices[i + 2]);
+                        trianglesList.add(triangle);
+                    }
+                }
+                mesh.setTriangles(trianglesList);
+            }
+        }
+
+        // Parse polylist (alternative to triangles)
+        NodeList polylistElements = meshElement.getElementsByTagName("polylist");
+        if (polylistElements.getLength() > 0) {
+            Element polylistElement = (Element) polylistElements.item(0);
+            String countStr = polylistElement.getAttribute("count");
+            if (!countStr.isEmpty()) {
+                mesh.setTriangleCount(Integer.parseInt(countStr));
+            }
+        }
+
+        return mesh;
+    }
+
+    private static DAESource parseSource(Element sourceElement) {
+        DAESource source = new DAESource();
+        source.setId(sourceElement.getAttribute("id"));
+        source.setName(sourceElement.getAttribute("name"));
+
+        NodeList floatArrays = sourceElement.getElementsByTagName("float_array");
+        if (floatArrays.getLength() > 0) {
+            Element floatArray = (Element) floatArrays.item(0);
+            String countStr = floatArray.getAttribute("count");
+            if (!countStr.isEmpty()) {
+                source.setCount(Integer.parseInt(countStr));
+            }
+
+            String[] values = floatArray.getTextContent().trim().split("\\s+");
+            List<Float> data = new ArrayList<>();
+            for (String value : values) {
+                if (!value.isEmpty()) {
+                    data.add(Float.parseFloat(value));
+                }
+            }
+            source.setData(data);
+        }
+
+        // Parse accessor for stride information
+        NodeList accessors = sourceElement.getElementsByTagName("accessor");
+        if (accessors.getLength() > 0) {
+            Element accessor = (Element) accessors.item(0);
+            String strideStr = accessor.getAttribute("stride");
+            if (!strideStr.isEmpty()) {
+                source.setStride(Integer.parseInt(strideStr));
+            }
+        }
+
+        return source;
+    }
+
+    private static DAEMaterial parseMaterial(Element materialElement) {
+        DAEMaterial material = new DAEMaterial();
+        material.setId(materialElement.getAttribute("id"));
+        material.setName(materialElement.getAttribute("name"));
+
+        // Parse instance_effect to get material properties
+        NodeList instanceEffects = materialElement.getElementsByTagName("instance_effect");
+        if (instanceEffects.getLength() > 0) {
+            Element instanceEffect = (Element) instanceEffects.item(0);
+            String url = instanceEffect.getAttribute("url");
+            if (url.startsWith("#")) {
+                material.setTextureId(url.substring(1));
+            }
+        }
+
+        return material;
+    }
+
+    private static DAEScene parseScene(Element sceneElement) {
+        DAEScene scene = new DAEScene();
+        scene.setId(sceneElement.getAttribute("id"));
+        scene.setName(sceneElement.getAttribute("name"));
+
+        NodeList nodes = sceneElement.getElementsByTagName("node");
+        for (int i = 0; i < nodes.getLength(); i++) {
+            Element nodeElement = (Element) nodes.item(i);
+            // Only parse direct children, not nested nodes
+            if (nodeElement.getParentNode().equals(sceneElement)) {
+                DAENode node = parseNode(nodeElement);
+                scene.addNode(node);
+            }
+        }
+
+        return scene;
+    }
+
+    private static DAENode parseNode(Element nodeElement) {
+        DAENode node = new DAENode();
+        node.setId(nodeElement.getAttribute("id"));
+        node.setName(nodeElement.getAttribute("name"));
+
+        // Parse transformation matrix
+        NodeList matrices = nodeElement.getElementsByTagName("matrix");
+        if (matrices.getLength() > 0) {
+            Element matrix = (Element) matrices.item(0);
+            String[] values = matrix.getTextContent().trim().split("\\s+");
+            if (values.length == 16) {
+                float[] transformation = new float[16];
+                for (int i = 0; i < 16; i++) {
+                    transformation[i] = Float.parseFloat(values[i]);
+                }
+                node.setTransformation(transformation);
+            }
+        }
+
+        // Parse instance_geometry
+        NodeList instanceGeometries = nodeElement.getElementsByTagName("instance_geometry");
+        if (instanceGeometries.getLength() > 0) {
+            Element instanceGeometry = (Element) instanceGeometries.item(0);
+            String url = instanceGeometry.getAttribute("url");
+            if (url.startsWith("#")) {
+                node.setGeometryRef(url.substring(1));
+            }
+        }
+
+        // Parse child nodes
+        NodeList childNodes = nodeElement.getChildNodes();
+        for (int i = 0; i < childNodes.getLength(); i++) {
+            Node childNode = childNodes.item(i);
+            if (childNode.getNodeType() == Node.ELEMENT_NODE && 
+                childNode.getNodeName().equals("node")) {
+                DAENode child = parseNode((Element) childNode);
+                node.addChild(child);
+            }
+        }
+
+        return node;
+    }
+}
