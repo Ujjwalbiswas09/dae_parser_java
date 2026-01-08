@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<COLLADA xmlns="http://www.collada.org/2005/11/COLLADASchema" version="1.4.1">
+  <asset>
+    <created>2024-01-01T00:00:00</created>
+    <modified>2024-01-01T00:00:00</modified>
+  </asset>
+  <library_geometries>
+    <geometry id="Triangle-mesh" name="Triangle">
+      <mesh>
+        <source id="Triangle-mesh-positions">
+          <float_array id="Triangle-mesh-positions-array" count="9">
+            0.0 1.0 0.0
+            -1.0 -1.0 0.0
+            1.0 -1.0 0.0
+          </float_array>
+          <technique_common>
+            <accessor source="#Triangle-mesh-positions-array" count="3" stride="3">
+              <param name="X" type="float"/>
+              <param name="Y" type="float"/>
+              <param name="Z" type="float"/>
+            </accessor>
+          </technique_common>
+        </source>
+        <vertices id="Triangle-mesh-vertices">
+          <input semantic="POSITION" source="#Triangle-mesh-positions"/>
+        </vertices>
+        <triangles count="1">
+          <input semantic="VERTEX" source="#Triangle-mesh-vertices" offset="0"/>
+          <p>0 1 2</p>
+        </triangles>
+      </mesh>
+    </geometry>
+  </library_geometries>
+  <library_visual_scenes>
+    <visual_scene id="Scene" name="Scene">
+      <node id="Triangle" name="Triangle" type="NODE">
+        <matrix>1 0 0 0 0 1 0 0 0 0 1 0 0 0 0 1</matrix>
+        <instance_geometry url="#Triangle-mesh"/>
+      </node>
+    </visual_scene>
+  </library_visual_scenes>
+  <scene>
+    <instance_visual_scene url="#Scene"/>
+  </scene>
+</COLLADA>
