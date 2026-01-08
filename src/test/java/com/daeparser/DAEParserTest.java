@@ -176,4 +176,73 @@ public class DAEParserTest {
         assertNotNull("Root node should not be null", rootNode);
         assertNotNull("Root node children list should not be null", rootNode.getChildren());
     }
+
+    @Test
+    public void testParseAnimation() throws Exception {
+        InputStream is = getClass().getResourceAsStream("/animated_cube.dae");
+        assertNotNull("Test file not found", is);
+
+        DAEDocument doc = DAEParser.parse(is);
+        assertNotNull("Document should not be null", doc);
+
+        // Check animations
+        List<DAEAnimation> animations = doc.getAnimations();
+        assertNotNull("Animations should not be null", animations);
+        assertEquals("Should have 1 animation", 1, animations.size());
+
+        DAEAnimation animation = animations.get(0);
+        assertEquals("Animation ID should be Cube_location_X", "Cube_location_X", animation.getId());
+        assertEquals("Animation name should be Cube_location_X", "Cube_location_X", animation.getName());
+
+        // Check sources
+        List<DAESource> sources = animation.getSources();
+        assertNotNull("Animation sources should not be null", sources);
+        assertTrue("Should have at least 2 sources (input/output)", sources.size() >= 2);
+
+        // Check samplers
+        List<DAESampler> samplers = animation.getSamplers();
+        assertNotNull("Samplers should not be null", samplers);
+        assertEquals("Should have 1 sampler", 1, samplers.size());
+
+        DAESampler sampler = samplers.get(0);
+        assertEquals("Sampler ID should be Cube_location_X-sampler", "Cube_location_X-sampler", sampler.getId());
+        assertNotNull("Sampler inputs should not be null", sampler.getInputs());
+        assertTrue("Sampler should have INPUT semantic", sampler.getInputs().containsKey("INPUT"));
+        assertTrue("Sampler should have OUTPUT semantic", sampler.getInputs().containsKey("OUTPUT"));
+
+        // Check channels
+        List<DAEChannel> channels = animation.getChannels();
+        assertNotNull("Channels should not be null", channels);
+        assertEquals("Should have 1 channel", 1, channels.size());
+
+        DAEChannel channel = channels.get(0);
+        assertEquals("Channel source should be Cube_location_X-sampler", "Cube_location_X-sampler", channel.getSource());
+        assertEquals("Channel target should be Cube/location.X", "Cube/location.X", channel.getTarget());
+    }
+
+    @Test
+    public void testAnimationSourceData() throws Exception {
+        InputStream is = getClass().getResourceAsStream("/animated_cube.dae");
+        DAEDocument doc = DAEParser.parse(is);
+
+        DAEAnimation animation = doc.getAnimations().get(0);
+        List<DAESource> sources = animation.getSources();
+
+        // Find the input source (time values)
+        DAESource inputSource = null;
+        for (DAESource source : sources) {
+            if (source.getId().contains("input")) {
+                inputSource = source;
+                break;
+            }
+        }
+
+        assertNotNull("Input source should be found", inputSource);
+        assertEquals("Input source should have 3 values", 3, inputSource.getData().size());
+
+        float[] timeData = inputSource.getDataAsArray();
+        assertEquals("First time should be 0.0", 0.0f, timeData[0], 0.001f);
+        assertEquals("Second time should be 1.0", 1.0f, timeData[1], 0.001f);
+        assertEquals("Third time should be 2.0", 2.0f, timeData[2], 0.001f);
+    }
 }

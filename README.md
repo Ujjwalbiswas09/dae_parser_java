@@ -7,6 +7,7 @@ A lightweight COLLADA (DAE) file parser for Java and Android applications. This 
 - ✅ Parse COLLADA DAE files (version 1.4.1)
 - ✅ Extract 3D geometry data (vertices, normals, texture coordinates)
 - ✅ Parse mesh triangles and polygons
+- ✅ Parse animations (keyframes, samplers, channels)
 - ✅ Access material properties
 - ✅ Parse scene hierarchies and transformations
 - ✅ Pure Java implementation (no external dependencies)
@@ -75,6 +76,22 @@ for (DAENode node : scene.getNodes()) {
     System.out.println("Node: " + node.getName());
     System.out.println("Geometry reference: " + node.getGeometryRef());
 }
+
+// Access animations
+for (DAEAnimation animation : doc.getAnimations()) {
+    System.out.println("Animation: " + animation.getName());
+    
+    // Get animation channels
+    for (DAEChannel channel : animation.getChannels()) {
+        System.out.println("  Target: " + channel.getTarget());
+    }
+    
+    // Get animation sources (keyframes, values)
+    for (DAESource source : animation.getSources()) {
+        float[] data = source.getDataAsArray();
+        System.out.println("  Source data: " + Arrays.toString(data));
+    }
+}
 ```
 
 ### Parsing Options
@@ -106,6 +123,9 @@ List<DAEGeometry> geometries = doc.getGeometries();
 // Get materials
 List<DAEMaterial> materials = doc.getMaterials();
 
+// Get animations
+List<DAEAnimation> animations = doc.getAnimations();
+
 // Get scene hierarchy
 DAEScene scene = doc.getScene();
 List<DAENode> nodes = scene.getNodes();
@@ -119,8 +139,11 @@ List<DAENode> nodes = scene.getNodes();
 - **DAEDocument**: Root document containing all parsed elements
 - **DAEGeometry**: Represents a 3D geometry with an ID and name
 - **DAEMesh**: Contains mesh data including sources, vertices, and triangles
-- **DAESource**: Data arrays for positions, normals, UVs, etc.
+- **DAESource**: Data arrays for positions, normals, UVs, animation keyframes, etc.
 - **DAEMaterial**: Material properties (colors, textures)
+- **DAEAnimation**: Animation data with channels, samplers, and sources
+- **DAEChannel**: Animation channel linking sampler to target node property
+- **DAESampler**: Animation sampler defining interpolation between keyframes
 - **DAEScene**: Scene hierarchy container
 - **DAENode**: Scene node with transformation matrix and geometry references
 

@@ -85,6 +85,21 @@ public class DAEParser {
             }
         }
 
+        // Parse library_animations
+        NodeList animationLibraries = root.getElementsByTagName("library_animations");
+        if (animationLibraries.getLength() > 0) {
+            Element animationLibrary = (Element) animationLibraries.item(0);
+            NodeList animations = animationLibrary.getElementsByTagName("animation");
+            for (int i = 0; i < animations.getLength(); i++) {
+                Element animationElement = (Element) animations.item(i);
+                // Only parse direct children, not nested animations
+                if (animationElement.getParentNode().equals(animationLibrary)) {
+                    DAEAnimation animation = parseAnimation(animationElement);
+                    daeDoc.addAnimation(animation);
+                }
+            }
+        }
+
         // Parse library_visual_scenes
         NodeList sceneLibraries = root.getElementsByTagName("library_visual_scenes");
         if (sceneLibraries.getLength() > 0) {
@@ -301,5 +316,78 @@ public class DAEParser {
         }
 
         return node;
+    }
+
+    private static DAEAnimation parseAnimation(Element animationElement) {
+        DAEAnimation animation = new DAEAnimation();
+        animation.setId(animationElement.getAttribute("id"));
+        animation.setName(animationElement.getAttribute("name"));
+
+        // Parse sources
+        NodeList sources = animationElement.getElementsByTagName("source");
+        for (int i = 0; i < sources.getLength(); i++) {
+            Element sourceElement = (Element) sources.item(i);
+            // Only parse direct children
+            if (sourceElement.getParentNode().equals(animationElement)) {
+                DAESource source = parseSource(sourceElement);
+                animation.addSource(source);
+            }
+        }
+
+        // Parse samplers
+        NodeList samplers = animationElement.getElementsByTagName("sampler");
+        for (int i = 0; i < samplers.getLength(); i++) {
+            Element samplerElement = (Element) samplers.item(i);
+            if (samplerElement.getParentNode().equals(animationElement)) {
+                DAESampler sampler = parseSampler(samplerElement);
+                animation.addSampler(sampler);
+            }
+        }
+
+        // Parse channels
+        NodeList channels = animationElement.getElementsByTagName("channel");
+        for (int i = 0; i < channels.getLength(); i++) {
+            Element channelElement = (Element) channels.item(i);
+            if (channelElement.getParentNode().equals(animationElement)) {
+                DAEChannel channel = parseChannel(channelElement);
+                animation.addChannel(channel);
+            }
+        }
+
+        return animation;
+    }
+
+    private static DAESampler parseSampler(Element samplerElement) {
+        DAESampler sampler = new DAESampler();
+        sampler.setId(samplerElement.getAttribute("id"));
+
+        // Parse input elements
+        NodeList inputs = samplerElement.getElementsByTagName("input");
+        for (int i = 0; i < inputs.getLength(); i++) {
+            Element input = (Element) inputs.item(i);
+            String semantic = input.getAttribute("semantic");
+            String source = input.getAttribute("source");
+            if (source.startsWith("#")) {
+                source = source.substring(1);
+            }
+            sampler.addInput(semantic, source);
+        }
+
+        return sampler;
+    }
+
+    private static DAEChannel parseChannel(Element channelElement) {
+        DAEChannel channel = new DAEChannel();
+        
+        String source = channelElement.getAttribute("source");
+        if (source.startsWith("#")) {
+            source = source.substring(1);
+        }
+        channel.setSource(source);
+        
+        String target = channelElement.getAttribute("target");
+        channel.setTarget(target);
+
+        return channel;
     }
 }

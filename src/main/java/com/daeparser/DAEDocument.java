@@ -10,11 +10,13 @@ public class DAEDocument {
     private String version;
     private List<DAEGeometry> geometries;
     private List<DAEMaterial> materials;
+    private List<DAEAnimation> animations;
     private DAEScene scene;
 
     public DAEDocument() {
         this.geometries = new ArrayList<>();
         this.materials = new ArrayList<>();
+        this.animations = new ArrayList<>();
     }
 
     public String getVersion() {
@@ -49,6 +51,18 @@ public class DAEDocument {
         this.materials.add(material);
     }
 
+    public List<DAEAnimation> getAnimations() {
+        return animations;
+    }
+
+    public void setAnimations(List<DAEAnimation> animations) {
+        this.animations = animations;
+    }
+
+    public void addAnimation(DAEAnimation animation) {
+        this.animations.add(animation);
+    }
+
     public DAEScene getScene() {
         return scene;
     }
@@ -63,6 +77,7 @@ public class DAEDocument {
                 "version='" + version + '\'' +
                 ", geometries=" + geometries.size() +
                 ", materials=" + materials.size() +
+                ", animations=" + animations.size() +
                 ", scene=" + scene +
                 '}';
     }
