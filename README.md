@@ -8,6 +8,8 @@ A lightweight COLLADA (DAE) file parser for Java and Android applications. This 
 - ✅ Extract 3D geometry data (vertices, normals, texture coordinates)
 - ✅ Parse mesh triangles and polygons
 - ✅ **Generate triangulated vertex data for VBO creation**
+- ✅ **Parse skeleton and skinning data for character animation**
+- ✅ **Support for skeletal hierarchies and joint transformations**
 - ✅ Parse animations (keyframes, samplers, channels)
 - ✅ Access material properties
 - ✅ Parse scene hierarchies and transformations
@@ -127,6 +129,9 @@ List<DAEMaterial> materials = doc.getMaterials();
 // Get animations
 List<DAEAnimation> animations = doc.getAnimations();
 
+// Get controllers (for skinned meshes)
+List<DAEController> controllers = doc.getControllers();
+
 // Get scene hierarchy
 DAEScene scene = doc.getScene();
 List<DAENode> nodes = scene.getNodes();
@@ -158,6 +163,78 @@ float[] texCoords = mesh.getTriangulatedTexCoords();  // [u, v, u, v, ...]
 - For VBO creation, you typically need expanded (non-indexed) vertex data where each triangle vertex has all its attributes
 - The triangulation methods expand the indexed data into contiguous arrays ready for GPU upload
 
+### Skeleton and Skinning for Character Animation
+
+The parser supports COLLADA's skeleton and skinning system, which allows you to load rigged characters for skeletal animation.
+
+```java
+DAEDocument doc = DAEParser.parse("character.dae");
+
+// Get controllers (skin data)
+List<DAEController> controllers = doc.getControllers();
+DAEController controller = controllers.get(0);
+DAESkin skin = controller.getSkin();
+
+// Get joint/bone names
+List<String> jointNames = skin.getJointNames();
+System.out.println("Joints: " + jointNames);
+
+// Get bind shape matrix (transforms mesh to bind pose)
+float[] bindShapeMatrix = skin.getBindShapeMatrix();
+
+// Get inverse bind matrices for each joint (16 floats per joint)
+float[] inverseBindMatrices = skin.getInverseBindMatrices();
+float[] joint0Matrix = skin.getJointInverseBindMatrix(0);
+
+// Get vertex weights (which joints influence which vertices)
+for (int i = 0; i < skin.getVertexWeights().size(); i++) {
+    float[] influences = skin.getVertexJointInfluences(i);
+    // influences array: [jointIdx0, weight0, jointIdx1, weight1, ...]
+    System.out.println("Vertex " + i + " influences: " + Arrays.toString(influences));
+}
+
+// Get skeleton hierarchy from scene
+DAEScene scene = doc.getScene();
+for (DAENode node : scene.getNodes()) {
+    // Check if node references a skinned mesh
+    if (node.getControllerRef() != null) {
+        System.out.println("Skinned mesh node: " + node.getName());
+        System.out.println("Controller: " + node.getControllerRef());
+        System.out.println("Skeleton roots: " + node.getSkeletonRefs());
+    }
+    
+    // Traverse joint hierarchy
+    traverseJoints(node);
+}
+
+void traverseJoints(DAENode node) {
+    if (node.isJoint()) {
+        System.out.println("Joint: " + node.getName());
+        float[] transform = node.getTransformation();
+        // Use joint transformation matrix
+    }
+    for (DAENode child : node.getChildren()) {
+        traverseJoints(child);
+    }
+}
+```
+
+**Skinning workflow:**
+1. Parse the DAE file to get geometry, controller (skin), and skeleton nodes
+2. The skin contains joint names, inverse bind matrices, and vertex weights
+3. Each vertex can be influenced by multiple joints with different weights
+4. Use the bind shape matrix, inverse bind matrices, and joint transformations to compute final vertex positions
+5. During animation, update joint transformations based on animation keyframes
+
+**Key concepts:**
+- **Skin**: Binds a mesh geometry to a skeleton for animation
+- **Joint/Bone**: A node in the skeleton hierarchy (marked with `type="JOINT"`)
+- **Bind Shape Matrix**: Transforms the mesh into the bind pose before skinning
+- **Inverse Bind Matrix**: The inverse of each joint's world transform at bind time
+- **Vertex Weights**: Defines how much each joint influences each vertex (skinning weights)
+- **Skeleton Reference**: Points to the root joint node(s) for the skeleton
+
+
 ## API Overview
 
 ### Core Classes
@@ -166,13 +243,15 @@ float[] texCoords = mesh.getTriangulatedTexCoords();  // [u, v, u, v, ...]
 - **DAEDocument**: Root document containing all parsed elements
 - **DAEGeometry**: Represents a 3D geometry with an ID and name
 - **DAEMesh**: Contains mesh data including sources, vertices, and triangles
-- **DAESource**: Data arrays for positions, normals, UVs, animation keyframes, etc.
+- **DAESource**: Data arrays for positions, normals, UVs, animation keyframes, joint names, etc.
 - **DAEMaterial**: Material properties (colors, textures)
+- **DAEController**: Controller containing skin data for skeletal animation
+- **DAESkin**: Skin data binding a mesh to a skeleton (joints, weights, bind matrices)
 - **DAEAnimation**: Animation data with channels, samplers, and sources
 - **DAEChannel**: Animation channel linking sampler to target node property
 - **DAESampler**: Animation sampler defining interpolation between keyframes
 - **DAEScene**: Scene hierarchy container
-- **DAENode**: Scene node with transformation matrix and geometry references
+- **DAENode**: Scene node with transformation matrix, geometry/controller references, and skeleton links
 
 ## Building
 
@@ -197,8 +276,10 @@ mvn test
 ```
 
 Test files are located in `src/test/resources/`:
-- `cube.dae` - A simple cube mesh
+- `cube.dae` - A simple cube mesh with normals
 - `triangle.dae` - A basic triangle
+- `animated_cube.dae` - A cube with location animation
+- `skinned_cylinder.dae` - A skinned mesh with 3-bone skeleton
 
 ## Requirements
 
@@ -220,11 +301,11 @@ If you encounter any issues or have questions, please open an issue on GitHub.
 ## Roadmap
 
 Future enhancements:
-- Support for animations
-- Support for skinning/rigging data
+- Morph targets/blend shapes support
 - Support for camera and light parsing
 - COLLADA 1.5.0 support
 - Binary DAE support
+- Advanced animation interpolation methods
 
 ## Author
 
