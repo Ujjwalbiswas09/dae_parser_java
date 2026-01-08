@@ -139,18 +139,35 @@ public class DAEParser {
                 mesh.setTriangleCount(Integer.parseInt(countStr));
             }
 
+            // Determine stride from input elements
+            NodeList inputElements = trianglesElement.getElementsByTagName("input");
+            int maxOffset = 0;
+            for (int i = 0; i < inputElements.getLength(); i++) {
+                Element input = (Element) inputElements.item(i);
+                String offsetStr = input.getAttribute("offset");
+                if (!offsetStr.isEmpty()) {
+                    int offset = Integer.parseInt(offsetStr);
+                    if (offset > maxOffset) {
+                        maxOffset = offset;
+                    }
+                }
+            }
+            int stride = maxOffset + 1;
+
             NodeList pElements = trianglesElement.getElementsByTagName("p");
             if (pElements.getLength() > 0) {
                 Element pElement = (Element) pElements.item(0);
                 String[] indices = pElement.getTextContent().trim().split("\\s+");
                 
                 List<int[]> trianglesList = new ArrayList<>();
-                for (int i = 0; i < indices.length; i += 3) {
-                    if (i + 2 < indices.length) {
+                // Process triangles considering stride (multiple inputs with offsets)
+                for (int i = 0; i < indices.length; i += stride * 3) {
+                    if (i + stride * 2 < indices.length) {
                         int[] triangle = new int[3];
+                        // Extract only vertex indices (offset 0)
                         triangle[0] = Integer.parseInt(indices[i]);
-                        triangle[1] = Integer.parseInt(indices[i + 1]);
-                        triangle[2] = Integer.parseInt(indices[i + 2]);
+                        triangle[1] = Integer.parseInt(indices[i + stride]);
+                        triangle[2] = Integer.parseInt(indices[i + stride * 2]);
                         trianglesList.add(triangle);
                     }
                 }

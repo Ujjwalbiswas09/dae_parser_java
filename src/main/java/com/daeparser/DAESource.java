@@ -69,8 +69,9 @@ public class DAESource {
 
     public float[] getDataAsArray() {
         float[] array = new float[data.size()];
-        for (int i = 0; i < data.size(); i++) {
-            array[i] = data.get(i);
+        int i = 0;
+        for (Float value : data) {
+            array[i++] = value;
         }
         return array;
     }
